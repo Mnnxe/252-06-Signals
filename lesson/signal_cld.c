@@ -1,26 +1,33 @@
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include <stdio.h>
-#include <sys/types.h>
+#include <stdlib.h>
 #include <unistd.h>
 
-/* one handler for both signals */
-/* argument is signal number */
-static void sig_usr(int signo) {
-  if (signo == SIGUSR1)
-    printf("received SIGUSR1\n");
-  else if (signo == SIGUSR2)
-    printf("received SIGUSR2\n");
-  else
-    printf("received signal %d\n", signo);
+static void sig_cld(int signo)
+/* interrupts pause() */
+{
+  pid_t pid; int status;
+  printf("SIGCLD received\n");
+  /* reestablish handler */
+  if (signal(SIGCLD, sig_cld) == SIG_ERR)
+    perror("signal error");
+  /* fetch child status */
+  if ((pid = wait(&status)) < 0)
+    perror("wait error");
+  printf("pid = %d\n", pid);
+  return;
 }
 
-int main(void) {
-  if (signal(SIGUSR1, sig_usr) == SIG_ERR)
-    perror("can't catch SIGUSR1");
-  if (signal(SIGUSR2, sig_usr) == SIG_ERR)
-    perror("can't catch SIGUSR2");
-  if(signal(SIGINT, sig_usr) == SIG_ERR)
-    perror("can't catch SIGINT");
-  for (;;)
-    pause();
+int main(){
+  pid_t pid;
+  if (signal(SIGCLD, sig_cld) == SIG_ERR) perror("signal error");
+  if ((pid = fork()) < 0) perror("fork error");
+  else if (pid == 0) { 
+    /* child */ 
+    sleep(2);   
+    exit(0);
+  }
+  pause(); /* parent */
 }
